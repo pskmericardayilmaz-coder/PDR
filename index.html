@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Öğrencileri cinsiyet, Akademik Başarı, davranış ve eski şube dengesine göre yeni sınıflara dağıtan yerel uygulama."
+    />
+    <title>Karma Analiz - Yarı Otomatik Sınıf Kontrolü</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-label="Karma Analiz logosu">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <rect x="10" y="11" width="24" height="22" rx="7" />
+              <path d="M15.5 22.5l4.2 4.2 9-9.4" />
+              <path d="M16 15.5h12" />
+            </svg>
+          </div>
+          <div>
+            <strong>Karma Analiz</strong>
+            <span>Yarı Otomatik Sınıf Kontrolü</span>
+          </div>
+        </div>
+
+        <nav class="main-nav" aria-label="Ana menü">
+          <button class="nav-item active" data-view="students">
+            <span class="nav-number">1</span>
+            <span>Öğrenciler</span>
+            <b id="navStudentCount">0</b>
+          </button>
+          <button class="nav-item" data-view="requests">
+            <span class="nav-number">2</span>
+            <span>Veli İstekleri</span>
+            <b id="navRequestCount">0</b>
+          </button>
+          <button class="nav-item" data-view="distribution">
+            <span class="nav-number">3</span>
+            <span>Yerleşim</span>
+          </button>
+          <button class="nav-item" data-view="results">
+            <span class="nav-number">4</span>
+            <span>Kontroller</span>
+          </button>
+        </nav>
+
+        <div class="app-credit">
+          <strong>© 2026 Arda Yılmaz. Tüm hakları saklıdır.</strong>
+          <span>
+            Bu uygulama ve sitedeki özgün içerikler Arda Yılmaz’a aittir.
+            İzinsiz olarak kopyalanamaz, çoğaltılamaz veya başka bir amaçla
+            kullanılamaz.
+          </span>
+          <span>Bu uygulama geliştirme aşamasındadır ve hata yapabilir.</span>
+          <span>Lütfen yalnızca sınıf dağılımı için gerekli bilgileri girin!</span>
+          <span>
+            Öğrenci adı, cinsiyet ve sınıf tercihleri dışında sağlık, aile,
+            kimlik, adres, telefon veya benzeri hassas kişisel verileri
+            paylaşmayın.
+          </span>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="mobile-menu" id="mobileMenu" aria-label="Menüyü aç">
+            Menü
+          </button>
+          <div>
+            <h1 id="pageTitle">Öğrenci Listesi</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="save-state" id="saveState">Kaydedildi</span>
+            <button class="button button-ghost" id="loadSampleButton">
+              Örnek Veri
+            </button>
+            <button class="button button-danger-ghost" id="clearDataButton">
+              Tüm Verileri Temizle
+            </button>
+          </div>
+        </header>
+
+        <section class="view active" id="studentsView">
+          <div class="summary-grid">
+            <article class="summary-card accent-blue">
+              <span>Toplam Öğrenci</span>
+              <strong id="studentTotal">0</strong>
+              <small id="oldClassSummary">Henüz veri yok</small>
+            </article>
+            <article class="summary-card accent-coral">
+              <span>Kız / Erkek</span>
+              <strong id="genderTotal">0 / 0</strong>
+              <small>Cinsiyet dengesi için kullanılacak</small>
+            </article>
+            <article class="summary-card accent-gold">
+              <span>Başarı Ortalaması</span>
+              <strong id="academicTotal">-</strong>
+              <small>Desteklenmeli · Orta · İyi</small>
+            </article>
+            <article class="summary-card accent-purple">
+              <span>Davranış İşareti</span>
+              <strong id="behaviorTotal">0</strong>
+              <small>Dengeli dağıtılacak</small>
+            </article>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Öğrenciler</h2>
+                <p>Her öğrencinin dağıtımda kullanılacak bilgilerini yönetin.</p>
+              </div>
+              <div class="button-row">
+                <input
+                  type="file"
+                  id="csvInput"
+                  accept=".csv,text/csv"
+                  hidden
+                />
+                <button class="button button-secondary" id="importCsvButton">
+                  CSV'den Aktar
+                </button>
+                <button class="button button-secondary" id="exportStudentsButton">
+                  Güncel Listeyi CSV İndir
+                </button>
+                <button class="text-button" id="downloadTemplateButton">
+                  CSV Şablonunu İndir
+                </button>
+              </div>
+            </div>
+
+            <div class="toolbar">
+              <label class="search-box">
+                <span>Ara</span>
+                <input
+                  type="search"
+                  id="studentSearch"
+                  placeholder="Öğrenci adı veya eski sınıf..."
+                />
+              </label>
+              <select id="oldClassFilter" aria-label="Eski Sınıfa göre filtrele">
+                <option value="">Tüm Eski Sınıflar</option>
+              </select>
+              <button class="button button-primary" id="addStudentButton">
+                Öğrenci Ekle
+              </button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Öğrenci</th>
+                    <th>Cinsiyet</th>
+                    <th>Eski Sınıf</th>
+                    <th>Akademik</th>
+                    <th>Davranış</th>
+                    <th>Not</th>
+                    <th aria-label="İşlemler"></th>
+                  </tr>
+                </thead>
+                <tbody id="studentTableBody"></tbody>
+              </table>
+              <div class="empty-state" id="studentEmptyState">
+                <div class="empty-illustration">4A → 5A</div>
+                <h3>Öğrenci listenizi ekleyin</h3>
+                <p>
+                  Tek tek öğrenci ekleyebilir veya CSV şablonunu doldurup
+                  aktarabilirsiniz.
+                </p>
+                <button class="button button-primary" id="emptyAddButton">
+                  İlk Öğrenciyi Ekle
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="requestsView">
+          <div class="info-banner">
+            <div class="info-icon">i</div>
+            <div>
+              <strong>Veli ve Öğretmen Taleplerini Burada Tanımlayın.</strong>
+            </div>
+          </div>
+
+          <div class="two-column">
+            <div class="panel sticky-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Yeni İstek</h2>
+                  <p>
+                    En az bir tercih girin. Sistem mümkünse ilk tercihi,
+                    değilse sıradakileri uygular.
+                  </p>
+                </div>
+                <div class="button-row">
+                  <input
+                    type="file"
+                    id="requestCsvInput"
+                    accept=".csv,text/csv"
+                    hidden
+                  />
+                  <button
+                    class="button button-secondary"
+                    type="button"
+                    id="importRequestCsvButton"
+                  >
+                    CSV'den Aktar
+                  </button>
+                  <button
+                    class="button button-secondary"
+                    type="button"
+                    id="exportRequestsButton"
+                  >
+                    Güncel İstekleri CSV İndir
+                  </button>
+                  <button
+                    class="text-button"
+                    type="button"
+                    id="downloadRequestTemplateButton"
+                  >
+                    CSV Şablonu
+                  </button>
+                </div>
+              </div>
+              <form id="requestForm" class="stack-form">
+                <label>
+                  Tercihte Bulunan Öğrenci
+                  <select id="requestStudentA" required></select>
+                </label>
+                <div class="preference-fields">
+                  <label>
+                    İlk Tercih
+                    <select id="requestChoice1" required></select>
+                  </label>
+                  <label>
+                    İkinci Tercih
+                    <select id="requestChoice2"></select>
+                  </label>
+                  <label>
+                    Üçüncü Tercih
+                    <select id="requestChoice3"></select>
+                  </label>
+                  <label>
+                    Dördüncü Tercih
+                    <select id="requestChoice4"></select>
+                  </label>
+                  <label>
+                    Beşinci Tercih
+                    <select id="requestChoice5"></select>
+                  </label>
+                </div>
+                <div class="settings-grid request-settings">
+                  <label>
+                    İstek Türü
+                    <select id="requestType">
+                      <option value="together">Birlikte</option>
+                      <option value="apart">Ayrı</option>
+                    </select>
+                  </label>
+                  <button
+                    class="button button-primary"
+                    type="submit"
+                    id="addRequestButton"
+                  >
+                    İsteği Ekle
+                  </button>
+                </div>
+                <label>
+                  Açıklama
+                  <textarea
+                    id="requestNote"
+                    rows="3"
+                    placeholder="İsteğin kaynağı veya kısa not..."
+                  ></textarea>
+                </label>
+              </form>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Girilen İstekler</h2>
+                  <p id="requestListSummary">Henüz istek girilmedi.</p>
+                </div>
+                <div class="button-row">
+                  <button
+                    class="button button-secondary"
+                    id="refreshRequestsButton"
+                    type="button"
+                  >
+                    Güncelle
+                  </button>
+                  <button
+                    class="button button-secondary"
+                    id="checkRequestsButton"
+                    type="button"
+                  >
+                    Hata Kontrol Et
+                  </button>
+                  <button
+                    class="button button-danger-ghost"
+                    id="clearRequestsButton"
+                    type="button"
+                  >
+                    Hepsini Sil
+                  </button>
+                </div>
+              </div>
+              <div
+                class="request-conflicts"
+                id="requestConflictPanel"
+                hidden
+              ></div>
+              <div class="request-toolbar">
+                <label class="search-box">
+                  <span>Ara</span>
+                  <input
+                    type="search"
+                    id="requestSearch"
+                    placeholder="Öğrenci veya tercih ara..."
+                  />
+                </label>
+                <label class="search-box">
+                  <span>Eski Sınıf</span>
+                  <select id="requestOldClassFilter">
+                    <option value="">Tüm Eski Sınıflar</option>
+                  </select>
+                </label>
+              </div>
+              <div class="request-list" id="requestList"></div>
+              <div class="empty-state compact" id="requestEmptyState">
+                <h3>Henüz istek yok</h3>
+                <p>Öğrenciler eklendikten sonra burada ilişki kurabilirsiniz.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="distributionView">
+          <div class="two-column distribution-layout">
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Yerleşim Ayarları</h2>
+                  <p>Yeni sınıfların adını ve sayısını belirleyin.</p>
+                </div>
+              </div>
+              <div class="settings-grid">
+                <label>
+                  Yeni Sınıf Sayısı
+                  <input
+                    type="number"
+                    id="classCount"
+                    min="2"
+                    max="12"
+                    placeholder="Örn. 6"
+                  />
+                </label>
+                <label>
+                  Sınıf Adı Başlangıcı
+                  <input
+                    type="number"
+                    id="classPrefix"
+                    min="1"
+                    max="12"
+                    step="1"
+                    placeholder="Örn. 5"
+                  />
+                </label>
+              </div>
+              <div class="class-preview" id="classNamePreview"></div>
+              <p class="capacity-note">
+                Her yeni sınıf en fazla 25 öğrenci alır. Ayarları girdikten
+                sonra öğrencileri Kontroller sekmesindeki çalışma alanında
+                yerleştirin.
+              </p>
+              <hr />
+              <h3>Denge Ölçütleri</h3>
+              <div class="criteria-list">
+                <div class="criterion">
+                  <span class="criterion-mark gender-mark">K/E</span>
+                  <div>
+                    <strong>Kız - Erkek Dengesi</strong>
+                    <p>Her sınıfta mümkün olan en yakın sayı hedeflenir.</p>
+                  </div>
+                  <select
+                    class="criterion-select"
+                    id="criterionGender"
+                    aria-label="Kız Erkek Dengesi durumu"
+                  >
+                    <option value="true">Etkin</option>
+                    <option value="false">Etkin Değil</option>
+                  </select>
+                </div>
+                <div class="criterion">
+                  <span class="criterion-mark academic-mark">1-3</span>
+                  <div>
+                    <strong>Akademik Başarı</strong>
+                    <p>Sınıf başarı ortalamaları birbirine yaklaştırılır.</p>
+                  </div>
+                  <select
+                    class="criterion-select"
+                    id="criterionAcademic"
+                    aria-label="Akademik Başarı dengesi durumu"
+                  >
+                    <option value="true">Etkin</option>
+                    <option value="false">Etkin Değil</option>
+                  </select>
+                </div>
+                <div class="criterion">
+                  <span class="criterion-mark class-mark">4A</span>
+                  <div>
+                    <strong>Eski Şube Dağılımı</strong>
+                    <p>Aynı eski şubeden öğrenciler eşit paylaştırılır.</p>
+                  </div>
+                  <select
+                    class="criterion-select"
+                    id="criterionOldClass"
+                    aria-label="Eski Şube Dağılımı durumu"
+                  >
+                    <option value="true">Etkin</option>
+                    <option value="false">Etkin Değil</option>
+                  </select>
+                </div>
+                <div class="criterion">
+                  <span class="criterion-mark same-gender-mark">H</span>
+                  <div>
+                    <strong>Kendi Sınıfından Hemcinsi</strong>
+                    <p>
+                      Her öğrenci yeni sınıfta eski şubesinden en az bir
+                      hemcinsiyle bulunur.
+                    </p>
+                  </div>
+                  <select
+                    class="criterion-select"
+                    id="criterionSameOldClassGender"
+                    aria-label="Kendi Sınıfından Hemcinsi durumu"
+                  >
+                    <option value="true">Etkin</option>
+                    <option value="false">Etkin Değil</option>
+                  </select>
+                </div>
+                <div class="criterion">
+                  <span class="criterion-mark behavior-mark">D</span>
+                  <div>
+                    <strong>Davranış Desteği</strong>
+                    <p>İşaretli öğrenciler sınıflara dengeli dağıtılır.</p>
+                  </div>
+                  <select
+                    class="criterion-select"
+                    id="criterionBehavior"
+                    aria-label="Davranış Desteği dengesi durumu"
+                  >
+                    <option value="true">Etkin</option>
+                    <option value="false">Etkin Değil</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="resultsView">
+          <input
+            type="file"
+            id="resultCsvInput"
+            accept=".csv,text/csv"
+            hidden
+          />
+          <div class="no-results" id="noResults">
+            <div class="result-orbit">Karma Analiz</div>
+            <h2>Henüz Sınıf Yerleşimi Hazırlanmadı</h2>
+            <p>
+              Öğrencileri ve istekleri girdikten sonra yerleşim adımında boş
+              sınıfları açın.
+            </p>
+            <div class="button-row">
+              <button
+                class="button button-secondary"
+                id="importResultEmptyButton"
+              >
+                Önceki oluşumu içe aktar (CSV)
+              </button>
+              <button class="button button-primary" data-go="distribution">
+                Yerleşime git
+              </button>
+            </div>
+          </div>
+
+          <div id="resultsContent" hidden>
+            <div class="results-hero">
+              <div class="button-row">
+                <button
+                  class="button button-secondary"
+                  id="importResultButton"
+                >
+                  Önceki oluşumu içe aktar (CSV)
+                </button>
+                <button class="button button-secondary" id="printButton">
+                  Yazdır
+                </button>
+                <button class="button button-secondary" id="excelButton">
+                  Excel olarak indir
+                </button>
+                <button class="button button-secondary" id="exportButton">
+                  Sonucu CSV indir
+                </button>
+              </div>
+            </div>
+
+            <div class="manual-workspace control-workspace">
+              <div class="manual-toolbar">
+                <div>
+                  <span class="solve-kicker">Canlı Kontrol</span>
+                  <h2 id="solveTitle">Sınıfları Elle Oluşturun</h2>
+                  <p id="solveReadiness">
+                    Yeni sınıf sayısı ve başlangıcı girildiğinde boş sınıflar
+                    burada açılır.
+                  </p>
+                </div>
+                <div class="auto-solve-box">
+                  <button
+                    class="button button-light"
+                    type="button"
+                    id="solveButton"
+                  >
+                    Sınıfları Otomatik Kar
+                  </button>
+                  <small class="auto-solve-note">
+                    İsteklere ve etkin denge ölçütlerine göre optimum sınıfları
+                    otomatik oluşturur.
+                  </small>
+                </div>
+                <div class="readiness-list">
+                  <div><span id="readyStudents">0</span> öğrenci</div>
+                  <div><span id="readyRequests">0</span> veli isteği</div>
+                  <div><span id="readyOldClasses">0</span> eski şube</div>
+                </div>
+              </div>
+
+              <div class="manual-control-grid">
+                <div class="manual-left-column">
+                  <div class="manual-transfer-bar">
+                    <label>
+                      Seçili Öğrencileri Aktar
+                      <select id="manualTargetClass"></select>
+                    </label>
+                    <button
+                      class="button button-primary"
+                      type="button"
+                      id="assignSelectedButton"
+                    >
+                      Seçili Öğrencileri Sınıfa Aktar
+                    </button>
+                    <button
+                      class="button button-secondary"
+                      type="button"
+                      id="clearSelectionButton"
+                    >
+                      Seçimi Temizle
+                    </button>
+                    <button
+                      class="button button-danger-ghost"
+                      type="button"
+                      id="resetAssignmentButton"
+                    >
+                      Tüm Değişiklikleri Geri Al
+                    </button>
+                  </div>
+
+                  <div
+                    class="manual-unassigned"
+                    id="manualUnassignedDrop"
+                    data-manual-unassigned
+                  >
+                    <div class="manual-section-header">
+                      <h3>Atanmamış Öğrenciler</h3>
+                      <span id="manualUnassignedCount">0</span>
+                    </div>
+                    <label class="compact-search">
+                      <span>Öğrenci Ara</span>
+                      <input
+                        type="search"
+                        id="manualStudentSearch"
+                        placeholder="Öğrenci adına göre ara..."
+                      />
+                    </label>
+                    <label class="compact-search">
+                      <span>Eski Sınıf Filtresi</span>
+                      <select id="manualStudentOldClassFilter">
+                        <option value="">Tüm Eski Sınıflar</option>
+                      </select>
+                    </label>
+                    <div class="manual-student-list" id="manualUnassignedList"></div>
+                  </div>
+                </div>
+
+                <div class="manual-check-panel" id="manualCheckPanel">
+                  <div class="manual-check-header">
+                    <h3>Kontrol ve Uyarılar</h3>
+                    <div class="manual-filter-row">
+                      <label>
+                        Uyarı Ara
+                        <input
+                          type="search"
+                          id="manualWarningSearch"
+                          placeholder="Öğrenci, sınıf veya uyarı..."
+                        />
+                      </label>
+                      <label>
+                        Eski Sınıf
+                        <select id="manualWarningOldClassFilter">
+                          <option value="">Tüm Eski Sınıflar</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="check-chip-grid" id="manualCheckSummary"></div>
+                  <div class="manual-warning-list" id="manualWarningList"></div>
+                </div>
+              </div>
+
+              <div class="manual-class-grid" id="manualClassGrid"></div>
+            </div>
+
+            <div class="metric-grid" id="resultMetrics"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="studentDialog">
+      <form method="dialog" id="studentForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Öğrenci bilgileri</p>
+            <h2 id="studentDialogTitle">Yeni öğrenci</h2>
+          </div>
+          <button
+            class="dialog-close"
+            type="button"
+            data-close-dialog
+            aria-label="Kapat"
+          >
+            ×
+          </button>
+        </div>
+        <input type="hidden" id="studentId" />
+        <div class="dialog-body">
+          <label class="field-wide">
+            Ad soyad
+            <input
+              type="text"
+              id="studentName"
+              required
+              autocomplete="off"
+              placeholder="ARDA Y."
+            />
+          </label>
+          <label>
+            Cinsiyet
+            <select id="studentGender" required>
+              <option value="K">Kız</option>
+              <option value="E">Erkek</option>
+            </select>
+          </label>
+          <label>
+            Eski Sınıf
+            <input
+              type="text"
+              id="studentOldClass"
+              required
+              maxlength="12"
+              placeholder="Örn. 4A"
+            />
+          </label>
+          <label class="field-wide">
+            Akademik Başarı
+            <div class="rating-input" id="academicRating">
+              <input
+                type="range"
+                id="studentAcademic"
+                min="1"
+                max="3"
+                step="1"
+                value="2"
+              />
+              <output id="academicOutput">Orta</output>
+            </div>
+          </label>
+          <label class="checkbox-field field-wide">
+            <input type="checkbox" id="studentBehavior" />
+            <span>
+              <strong>Davranış Desteği Gerekiyor</strong>
+              <small
+                >İşaretli öğrenciler yeni sınıflara dengeli dağıtılır.</small
+              >
+            </span>
+          </label>
+          <label class="field-wide">
+            Öğrenci notu
+            <textarea
+              id="studentNotes"
+              rows="3"
+              placeholder="Dağıtım veya öğretmen devri için not..."
+            ></textarea>
+          </label>
+        </div>
+        <div class="dialog-footer">
+          <button
+            class="button button-secondary"
+            type="button"
+            data-close-dialog
+          >
+            Vazgeç
+          </button>
+          <button
+            class="button button-primary"
+            type="submit"
+            id="saveStudentButton"
+          >
+            Öğrenciyi kaydet
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="privacyDialog" class="privacy-dialog">
+      <form method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Veri güvenliği uyarısı</p>
+            <h2>Lütfen dikkatle okuyun</h2>
+          </div>
+        </div>
+        <div class="privacy-dialog-body">
+          <p>Lütfen yalnızca sınıf dağılımı için gerekli bilgileri girin.</p>
+          <p>
+            Veri güvenliği açısından öğrenci ad ve soyadları tam şekilde değil,
+            kısaltılmış biçimde yazılmalıdır.
+          </p>
+          <p><strong>Örnek: ARDA Y.</strong></p>
+          <p>
+            Sınıf dağılımı için gerekli olan öğrenci adı, soyadı kısaltması,
+            cinsiyet, mevcut sınıf ve sınıf tercihleri dışında; sağlık bilgisi,
+            aile bilgisi, kimlik numarası, adres, telefon numarası veya benzeri
+            hassas kişisel veriler kesinlikle paylaşılmamalıdır.
+          </p>
+          <p>
+            Sisteme girilen bilgilerin doğruluğu ve paylaşılan verilerin içeriği
+            kullanıcı sorumluluğundadır. Gerekli olmayan veya hassas kişisel
+            verilerin paylaşılması durumunda doğabilecek sorumluluk kullanıcıya
+            aittir.
+          </p>
+        </div>
+        <div class="dialog-footer">
+          <button class="button button-primary" type="submit" id="acceptPrivacyButton">
+            Anladım, devam etmek istiyorum.
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="requestMatchDialog" class="wide-dialog">
+      <form method="dialog" id="requestMatchForm" novalidate>
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow" id="requestMatchEyebrow">CSV öğrenci eşleştirmesi</p>
+            <h2 id="requestMatchTitle">Uyuşmayan girişleri düzeltin</h2>
+          </div>
+          <button
+            class="dialog-close"
+            type="button"
+            id="closeRequestMatchDialog"
+            aria-label="Kapat"
+          >
+            ×
+          </button>
+        </div>
+        <div class="match-dialog-intro">
+          <span id="requestMatchIntro">
+            CSV'deki bazı isimler öğrenci listesiyle eşleşmedi. Doğru
+            öğrencileri seçin. Kullanılmayacak tercihleri “Tercih yok”
+            yapabilir veya istemediğiniz satırı silebilirsiniz.
+          </span>
+          <button
+            class="button button-danger-ghost"
+            type="button"
+            id="clearUnmatchedChoicesButton"
+          >
+            Hatalı tercihleri Tercih yok yap
+          </button>
+        </div>
+        <div class="request-match-toolbar">
+          <label class="search-box">
+            <span>Ara</span>
+            <input
+              type="search"
+              id="requestMatchSearch"
+              placeholder="Satır, öğrenci veya uyarı ara..."
+            />
+          </label>
+        </div>
+        <div class="request-match-list" id="requestMatchList"></div>
+        <div
+          class="request-match-notice"
+          id="requestMatchNotice"
+          role="alert"
+          aria-live="assertive"
+          hidden
+        ></div>
+        <div class="dialog-footer">
+          <button
+            class="button button-secondary"
+            type="button"
+            id="cancelRequestMatch"
+          >
+            Vazgeç
+          </button>
+          <button
+            class="button button-primary"
+            type="submit"
+            id="saveRequestMatchesButton"
+          >
+            Düzeltilen istekleri aktar
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <form class="inline-editor" id="inlineEditor" hidden>
+      <strong id="inlineEditorTitle">Bilgiyi düzenle</strong>
+      <div id="inlineEditorControl"></div>
+      <div class="inline-editor-actions">
+        <button
+          class="button button-secondary"
+          type="button"
+          id="cancelInlineEdit"
+        >
+          Vazgeç
+        </button>
+        <button class="button button-primary" type="submit">Kaydet</button>
+      </div>
+    </form>
+    <div class="solving-overlay" id="solvingOverlay" hidden>
+      <div class="spinner"></div>
+      <strong>En dengeli sınıflar aranıyor...</strong>
+      <span>Veli İstekleri ve tüm denge ölçütleri karşılaştırılıyor.</span>
+    </div>
+
+    <script src="solver.js"></script>
+    <script src="csv-utils.js"></script>
+    <script src="academic-utils.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
